@@ -3,7 +3,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/khcrysalis/antrag?include_prereleases)](https://github.com/khcrysalis/protokolle/releases)
 [![GitHub License](https://img.shields.io/github/license/khcrysalis/antrag?color=%23C96FAD)](https://github.com/khcrysalis/protokolle/blob/main/LICENSE)
 
-An app to list iOS/iPadOS app's, for stock devices. This app uses [idevice](https://github.com/jkcoxson/idevice) and lockdownd pairing to retrieve installed apps.
+An app to list iOS/iPadOS apps. This version relies on [TrollStore](https://github.com/opa334/TrollStore) to access installed apps directly on device.
 
 ### Features
 
@@ -16,12 +16,10 @@ Visit [releases](https://github.com/khcrysalis/Antrag/releases) and get the late
 
 ## How does it work?
 
-- Establish a heartbeat with a TCP provider (the app will need this for later).
-  - For it to be successful, we need a pairing file from [JitterbugPair](https://github.com/osy/Jitterbug/releases) and a [VPN](https://apps.apple.com/us/app/stosvpn/id6744003051).
-- When preparing the list, we need to establish another connection but for `installation_proxy` using our heartbeat provider and client handle.
-- Then we can use `installation_proxy_get_apps` using that handle to list applications.
+- Establish a heartbeat with a TCP provider for compatibility with older setups.
+- When installed through TrollStore, the app reads the application list directly from the device's TrollStore container without needing pairing files.
 
-Due to how it works right now we need both a VPN and a lockdownd pairing file, this means you will need a computer for its initial setup.
+This version does not require external pairing files. Instead, make sure the app is installed through TrollStore to enable local management of applications.
 
 ## Building
 
@@ -59,7 +57,7 @@ Using the makefile will automatically create an adhoc ipa inside the packages di
 ## Acknowledgements
 
 - [Samara](https://github.com/khcrysalis) - The maker
-- [idevice](https://github.com/jkcoxson/idevice) - Backend functionality, uses `installation_proxy` to retrieve messages.
+- [TrollStore](https://github.com/opa334/TrollStore) - Provides access to installed apps and installation management.
 
 ## License 
 
