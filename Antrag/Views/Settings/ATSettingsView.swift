@@ -41,15 +41,26 @@ struct ATSettingsView: View {
 					}
 				}
 				
-				Section(.localized("Pairing")) {
-					NavigationLink(.localized("Tunnel & Pairing")) {
-						ATTunnelView()
-					}
-				}
-				
-				_feedback()
-				_help()
-			}
+                                Section(.localized("Pairing")) {
+                                        NavigationLink(.localized("Tunnel & Pairing")) {
+                                                ATTunnelView()
+                                        }
+                                }
+
+                                if TrollStoreHelper.isInstalled {
+                                        Section("TrollStore") {
+                                                Button(
+                                                        .localized("Open TrollStore"),
+                                                        systemImage: "t.square"
+                                                ) {
+                                                        TrollStoreHelper.openTrollStore()
+                                                }
+                                        }
+                                }
+
+                                _feedback()
+                                _help()
+                        }
 			.navigationTitle(.localized("Settings"))
 			.navigationBarTitleDisplayMode(.large)
 		}

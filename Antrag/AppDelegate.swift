@@ -12,13 +12,21 @@ import IDeviceSwift
 class AppDelegate: UIResponder, UIApplicationDelegate {
 	let heartbeart = HeartbeatManager.shared
 	
-	func application(
-		_ application: UIApplication,
-		didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-	) -> Bool {
-		_createSourcesDirectory()
-		return true
-	}
+        func application(
+                _ application: UIApplication,
+                didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+        ) -> Bool {
+                _createSourcesDirectory()
+                if !TrollStoreHelper.isInstalled {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                UIAlertController.showAlertWithOk(
+                                        title: "TrollStore Required",
+                                        message: "Please install this app through TrollStore."
+                                )
+                        }
+                }
+                return true
+        }
 	
 	private func _createSourcesDirectory() {
 		let fileManager = FileManager.default
