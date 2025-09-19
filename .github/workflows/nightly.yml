@@ -9,6 +9,10 @@ jobs:
         with:
           submodules: 'true'
 
+      - name: Install Idid with brew
+        run: |
+          brew install ldid
+
       - name: Use Xcode 16.2
         run: |
           sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
