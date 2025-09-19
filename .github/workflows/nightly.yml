@@ -22,10 +22,9 @@ jobs:
           agvtool new-version -all $(git rev-parse HEAD)
           make
           mkdir upload
-          mv packages/* upload/
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Antrag
+          name: Antrag-TS
           path: upload/*
