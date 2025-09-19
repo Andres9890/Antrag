@@ -1,13 +1,12 @@
 //
-//  ATViewController.swift
-//  Antrag
+//  ATAppsViewController.swift
+//  Antrag - TrollStore Version
 //
-//  Created by samara on 7.06.2025.
+//  Updated to use TrollStore's LSApplicationWorkspace instead of idevice
 //
 
 import UIKit
 import class SwiftUI.UIHostingController
-import IDeviceSwift
 
 // MARK: Class extension: Enum
 extension ATAppsViewController {
@@ -27,17 +26,12 @@ extension ATAppsViewController {
 
 // MARK: - Class
 class ATAppsViewController: UITableViewController {
-	var apps: [AppInfo] = []
-	var allSortedApps: [AppInfo] = [] // backup
-	var sortedApps: [AppInfo] = [] // main
+	var apps: [TSAppInfo] = []
+	var allSortedApps: [TSAppInfo] = [] // backup
+	var sortedApps: [TSAppInfo] = [] // main
 	var appType: AppType = .user
 	
-	var appsManager: InstallationAppProxy {
-		let listApps = InstallationAppProxy()
-		listApps.delegate = self
-		return listApps
-	}
-	
+	private let appManager = TrollStoreAppManager()
 	private var _didLoad = false
 	
 	override func viewDidLoad() {
@@ -45,7 +39,19 @@ class ATAppsViewController: UITableViewController {
 		setupTableView()
 		setupNavigation()
 		setupSearchController()
-		setupListeners()
+		setupAppManager()
+		
+		// Load apps immediately since we don't need VPN/pairing
+		loadApplications()
+	}
+	
+	override func viewWillAppear(_ animated: Bool) {
+		super.viewWillAppear(animated)
+		
+		// Refresh apps when returning to view
+		if _didLoad {
+			loadApplications()
+		}
 	}
 	
 	// MARK: Setup
@@ -79,13 +85,8 @@ class ATAppsViewController: UITableViewController {
 		)
 	}
 	
-	func setupListeners() {
-		NotificationCenter.default.addObserver(
-			self,
-			selector: #selector(listApplicationsAction),
-			name: .heartbeat,
-			object: nil
-		)
+	func setupAppManager() {
+		appManager.delegate = self
 	}
 	
 	// MARK: Actions
@@ -107,29 +108,59 @@ class ATAppsViewController: UITableViewController {
 	}
 	
 	@objc func reloadAction() {
-		_didLoad = false
-		HeartbeatManager.shared.start(true)
+		loadApplications()
 	}
 	
-	@objc func listApplicationsAction() {
-		guard !_didLoad else { return }
-		_didLoad = true
-
-		Task {
-			do {
-				try await appsManager.listApps()
-			} catch {
-				await MainActor.run {
-					UIAlertController.showAlertWithOk(
-						title: nil,
-						message: error.localizedDescription,
-						action: {
-							HeartbeatManager.shared.start(true)
-						}
-					)
+	func loadApplications() {
+		navigationItem.leftBarButtonItem?.isEnabled = false
+		appManager.listAllApplications()
+	}
+	
+	func filterAndReload() {
+		let generator = UIImpactFeedbackGenerator(style: .light)
+		
+		sortedApps = apps
+			.filter {
+				switch appType {
+				case .system: return $0.applicationType == "System"
+				case .user: return $0.applicationType == "User"
 				}
 			}
+			.sorted {
+				let name1 = $0.displayName ?? $0.executableName ?? ""
+				let name2 = $1.displayName ?? $1.executableName ?? ""
+				let result = name1.localizedCaseInsensitiveCompare(name2)
+				return result == .orderedAscending
+			}
+		
+		allSortedApps = sortedApps
+		
+		generator.impactOccurred()
+		
+		if #available(iOS 17.0, *) {
+			setNeedsUpdateContentUnavailableConfiguration()
 		}
+		
+		tableView.reloadSections(IndexSet(integer: 0), with: .automatic)
+	}
+}
+
+// MARK: - TrollStore App Manager Delegate
+extension ATAppsViewController: TrollStoreAppManagerDelegate {
+	func didUpdateApplications(_ apps: [TSAppInfo]) {
+		self.apps = apps
+		self._didLoad = true
+		self.navigationItem.leftBarButtonItem?.isEnabled = true
+		filterAndReload()
+	}
+	
+	func didFailWithError(_ error: Error) {
+		self.navigationItem.leftBarButtonItem?.isEnabled = true
+		
+		UIAlertController.showAlertWithOk(
+			title: "Error",
+			message: error.localizedDescription
+		)
 	}
 }
 
@@ -180,26 +211,31 @@ extension ATAppsViewController {
 		let app = sortedApps[indexPath.row]
 		var actions: [UIContextualAction] = []
 		
-		if let id = app.CFBundleIdentifier {
-			let deleteAction = UIContextualAction(style: .destructive, title: .localized("Delete")) { _,_,_ in
+		let bundleIdentifier = app.bundleIdentifier
+		
+		// Only allow deletion for User apps
+		if app.applicationType == "User" {
+			let deleteAction = UIContextualAction(style: .destructive, title: .localized("Delete")) { _, _, completion in
 				Task {
 					do {
-						try await InstallationAppProxy.deleteApp(for: id)
+						try TrollStoreAppManager.deleteApp(bundleIdentifier: bundleIdentifier)
 						await MainActor.run {
 							self.sortedApps.remove(at: indexPath.row)
 							
-							if let fullIndex = self.apps.firstIndex(where: { $0.CFBundleIdentifier == id }) {
+							if let fullIndex = self.apps.firstIndex(where: { $0.bundleIdentifier == bundleIdentifier }) {
 								self.apps.remove(at: fullIndex)
 							}
 							
 							self.tableView.deleteRows(at: [indexPath], with: .automatic)
+							completion(true)
 						}
 					} catch {
 						await MainActor.run {
 							UIAlertController.showAlertWithOk(
-								title: nil,
+								title: "Error",
 								message: error.localizedDescription
 							)
+							completion(false)
 						}
 					}
 				}
@@ -208,13 +244,14 @@ extension ATAppsViewController {
 			deleteAction.image = UIImage(systemName: "trash.fill")
 			deleteAction.backgroundColor = .systemRed
 			actions.append(deleteAction)
-			
-			let openAction = UIContextualAction(style: .normal, title: .localized("Open")) { _,_,_ in
-				UIApplication.openApp(with: id)
-			}
-			openAction.image = UIImage(systemName: "arrow.up.forward")
-			actions.append(openAction)
 		}
+		
+		let openAction = UIContextualAction(style: .normal, title: .localized("Open")) { _, _, completion in
+			_ = TrollStoreAppManager.openApp(bundleIdentifier: bundleIdentifier)
+			completion(true)
+		}
+		openAction.image = UIImage(systemName: "arrow.up.forward")
+		actions.append(openAction)
 		
 		let configuration = UISwipeActionsConfiguration(actions: actions)
 		configuration.performsFirstActionWithFullSwipe = false
@@ -230,7 +267,7 @@ extension ATAppsViewController {
 			empty.background.backgroundColor = .systemBackground
 			empty.image = UIImage(systemName: "nosign.app")
 			empty.text = .localized("No Apps Found")
-			empty.secondaryText = .localized("Please make sure you are connected to the VPN and have a pairing file.")
+			empty.secondaryText = "Make sure this app is installed via TrollStore to access system APIs."
 			empty.background = .listSidebarCell()
 			
 			config = empty
@@ -252,11 +289,10 @@ extension ATAppsViewController: UISearchResultsUpdating {
 		}
 		
 		sortedApps = allSortedApps.filter { app in
-			app.CFBundleDisplayName?.lowercased().contains(searchText) == true ||
-			app.CFBundleExecutable?.lowercased().contains(searchText) == true ||
-			app.CFBundleIdentifier?.lowercased().contains(searchText) == true
+			app.displayName?.lowercased().contains(searchText) == true ||
+			app.executableName?.lowercased().contains(searchText) == true ||
+			app.bundleIdentifier.lowercased().contains(searchText) == true
 		}
 		tableView.reloadData()
 	}
 }
-

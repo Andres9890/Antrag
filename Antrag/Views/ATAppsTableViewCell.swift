@@ -1,12 +1,11 @@
 //
-//  ATAppsCollectionViewCell.swift
-//  Antrag
+//  ATAppsTableViewCell.swift
+//  Antrag - TrollStore Version
 //
-//  Created by samara on 7.06.2025.
+//  Updated to use TSAppInfo instead of AppInfo from idevice
 //
 
 import UIKit
-import IDeviceSwift
 
 // MARK: - Class
 class ATAppsTableViewCell: UITableViewCell {
@@ -119,19 +118,25 @@ class ATAppsTableViewCell: UITableViewCell {
 		])
 	}
 	
-	func configure(with app: AppInfo) {
-		let name = app.CFBundleDisplayName ?? app.CFBundleExecutable
-		let version = app.CFBundleShortVersionString ?? app.CFBundleVersion ?? "0"
-		let identifier = app.CFBundleIdentifier ?? ""
+	func configure(with app: TSAppInfo) {
+		let name = app.displayName ?? app.executableName ?? "Unknown"
+		let version = app.shortVersionString ?? app.bundleVersion ?? "0"
+		let identifier = app.bundleIdentifier
 		
 		nameLabel.text = name
 		descriptionLabel.text = "\(version) • \(identifier)"
 		
-		Task { [weak self] in
-			guard let self else { return }
-			if let image = try? await InstallationAppProxy.getAppIconCached(for: identifier) {
-				DispatchQueue.main.async {
-					self.iconImageView.image = image
+		// Set icon if available from TSAppInfo
+		if let iconData = app.iconData, let image = UIImage(data: iconData) {
+			iconImageView.image = image
+		} else {
+			// Fallback: try to get icon asynchronously
+			Task { [weak self] in
+				guard let self else { return }
+				if let image = try? await TrollStoreAppManager.getAppIcon(for: identifier) {
+					DispatchQueue.main.async {
+						self.iconImageView.image = image
+					}
 				}
 			}
 		}

@@ -1,52 +1,22 @@
 //
-//  SYSettingsView.swift
-//  syslog
+//  ATSettingsView.swift
+//  Antrag - TrollStore Version
 //
-//  Created by samara on 17.05.2025.
+//  Removed VPN and pairing file requirements
 //
 
 import SwiftUI
 
 // MARK: - View
 struct ATSettingsView: View {
-	// i hate app review
-	@AppStorage("AT.darkBlockchain") private var _darkBlockchain: Bool = false
-	@AppStorage("AT.enterTheWorld")
-	private var _enterTheWorld: Int = 0
-	private let _enterTheWorldMethods: [String] = [
-		.localized("Congnition"),
-		.localized("Zodiac"),
-		.localized("Kenos"),
-		.localized("Sonic Wave"),
-		.localized("Thinking Space")
-	]
-	
-	
-	private let _donationsUrl = "https://github.com/sponsors/khcrysalis"
-	private let _githubUrl = "https://github.com/khcrysalis/Antrag"
+	private let _githubUrl = "https://github.com/Andres9890/Antrag-TS"
 	
 	// MARK: Body
 	
 	var body: some View {
 		NavigationStack {
 			Form {
-				Section(.localized("General")) {
-					Toggle(.localized("Dark Blockchain"), isOn: $_darkBlockchain)
-					
-					Picker(.localized("Pairing Level"), selection: $_enterTheWorld) {
-						ForEach(0..<_enterTheWorldMethods.count, id: \.self) { index in
-							Text(verbatim: "\(_enterTheWorldMethods[index]) [\(index)]")
-								.tag(index)
-						}
-					}
-				}
-				
-				Section(.localized("Pairing")) {
-					NavigationLink(.localized("Tunnel & Pairing")) {
-						ATTunnelView()
-					}
-				}
-				
+				_trollStoreInfo()
 				_feedback()
 				_help()
 			}
@@ -58,6 +28,26 @@ struct ATSettingsView: View {
 
 // MARK: - View extension
 extension ATSettingsView {
+	@ViewBuilder
+	private func _trollStoreInfo() -> some View {
+		Section(.localized("TrollStore")) {
+			HStack {
+				VStack(alignment: .leading, spacing: 4) {
+					Text("Native App Management")
+						.font(.headline)
+					Text("This app uses TrollStore's LSApplicationWorkspace APIs for direct system-level app access without requiring VPN or pairing files.")
+						.font(.subheadline)
+						.foregroundStyle(.secondary)
+				}
+				Spacer()
+				Image(systemName: "checkmark.circle.fill")
+					.foregroundStyle(.green)
+					.font(.title2)
+			}
+			.padding(.vertical, 4)
+		}
+	}
+	
 	@ViewBuilder
 	private func _feedback() -> some View {
 		Section {
@@ -83,11 +73,11 @@ extension ATSettingsView {
 	@ViewBuilder
 	private func _help() -> some View {
 		Section(.localized("Help")) {
-			Button(.localized("Pairing File Guide"), systemImage: "questionmark.circle") {
-				UIApplication.open("https://github.com/StephenDev0/StikDebug-Guide/blob/main/pairing_file.md")
+			Button(.localized("TrollStore Installation Guide"), systemImage: "questionmark.circle") {
+				UIApplication.open("https://ios.cfw.guide/installing-trollstore/")
 			}
-			Button(.localized("Download StosVPN"), systemImage: "arrow.down.app") {
-				UIApplication.open("https://apps.apple.com/us/app/stosvpn/id6744003051")
+			Button(.localized("Building .tipa Files"), systemImage: "hammer") {
+				UIApplication.open("https://github.com/khcrysalis/Antrag#building")
 			}
 		}
 	}

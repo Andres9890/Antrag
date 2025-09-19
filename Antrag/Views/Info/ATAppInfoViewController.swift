@@ -1,12 +1,11 @@
 //
 //  ATAppInfoViewController.swift
-//  Antrag
+//  Antrag - TrollStore Version
 //
-//  Created by samara on 7.06.2025.
+//  Updated to use TSAppInfo instead of AppInfo from idevice
 //
 
 import UIKit
-import IDeviceSwift
 
 // MARK: - Class extension: ContentStruct
 extension ATAppInfoViewController {
@@ -46,9 +45,9 @@ class ATAppInfoViewController: UITableViewController {
 		return button
 	}()
 	
-	var app: AppInfo
+	var app: TSAppInfo
 	
-	init(app: AppInfo) {
+	init(app: TSAppInfo) {
 		self.app = app
 		super.init(style: .insetGrouped)
 		buildInfoSections()
@@ -69,7 +68,7 @@ class ATAppInfoViewController: UITableViewController {
 	func setupNavigation() {
 		Task { [weak self] in
 			guard let self else { return }
-			if let image = try? await InstallationAppProxy.getAppIconCached(for: app.CFBundleIdentifier ?? "") {
+			if let image = try? await TrollStoreAppManager.getAppIcon(for: app.bundleIdentifier) {
 				DispatchQueue.main.async {
 					self.appIcon = image
 					self.fadingImageView.image = image
@@ -107,57 +106,49 @@ class ATAppInfoViewController: UITableViewController {
 		var paths: [LabeledInfo] = []
 		
 		// general
-		if let name = app.CFBundleName, !name.isEmpty {
+		if let name = app.executableName, !name.isEmpty {
 			general.append(.init(title: .localized("Name"), value: name))
 		}
-		if let bundleId = app.CFBundleIdentifier, !bundleId.isEmpty {
-			general.append(.init(title: .localized("Bundle Identifier"), value: bundleId))
+		if !app.bundleIdentifier.isEmpty {
+			general.append(.init(title: .localized("Bundle Identifier"), value: app.bundleIdentifier))
 		}
-		if let type = app.ApplicationType, !type.isEmpty {
-			general.append(.init(title: .localized("Type"), value: type))
+		if !app.applicationType.isEmpty {
+			general.append(.init(title: .localized("Type"), value: app.applicationType))
 		}
 		
 		// platform
-		if let version = app.CFBundleShortVersionString, !version.isEmpty {
+		if let version = app.shortVersionString, !version.isEmpty {
 			platform.append(.init(title: .localized("Application Version"), value: version))
 		}
-		if let build = app.CFBundleVersion, !build.isEmpty {
+		if let build = app.bundleVersion, !build.isEmpty {
 			platform.append(.init(title: .localized("Application Build"), value: build))
 		}
-		if let sdk = app.DTPlatformVersion, !sdk.isEmpty {
+		if let sdk = app.sdkVersion, !sdk.isEmpty {
 			platform.append(.init(title: .localized("SDK Version Built with"), value: sdk))
 		}
-		if let minOS = app.MinimumOSVersion, !minOS.isEmpty {
+		if let minOS = app.minimumOSVersion, !minOS.isEmpty {
 			platform.append(.init(title: .localized("Minimum iOS Version Required"), value: minOS))
 		}
 		
 		// signed
-		if let signedby = app.SignerIdentity, !signedby.isEmpty {
+		if let signedby = app.signerIdentity, !signedby.isEmpty {
 			signed.append(.init(title: .localized("Signed by"), value: signedby))
 		}
-		if let isAppClip = app.IsAppClip {
-			extra.append(.init(title: .localized("Is an App Clip"), value: isAppClip.description))
-		}
-		if let isFromAppStore = app.IsUpgradeable {
-			extra.append(.init(title: .localized("Can be upgraded"), value: isFromAppStore.description))
-		}
+		
+		// extra
+		extra.append(.init(title: .localized("Is an App Clip"), value: app.isAppClip.description))
+		extra.append(.init(title: .localized("Can be upgraded"), value: app.isUpgradeable.description))
 		
 		// dicts
-		if let entitlements = app.Entitlements, !entitlements.isEmpty {
+		if let entitlements = app.entitlements, !entitlements.isEmpty {
 			dicts.append(.init(title: .localized("Entitlements"), value: ""))
-		}
-		if let icons = app.CFBundleIcons, !icons.isEmpty {
-			dicts.append(.init(title: .localized("Icons"), value: ""))
-		}
-		if let icons = app.CFBundleIcons_iPad, !icons.isEmpty {
-			dicts.append(.init(title: .localized("Icons (iPad)"), value: ""))
 		}
 		
 		// paths
-		if let bundlePath = app.Path, !bundlePath.isEmpty {
+		if let bundlePath = app.bundlePath, !bundlePath.isEmpty {
 			paths.append(.init(title: .localized("Bundle Path"), value: bundlePath))
 		}
-		if let containerPath = app.Container, !containerPath.isEmpty {
+		if let containerPath = app.containerPath, !containerPath.isEmpty {
 			paths.append(.init(title: .localized("Container Path"), value: containerPath))
 		}
 		
@@ -173,7 +164,7 @@ class ATAppInfoViewController: UITableViewController {
 	}
 	
 	@objc private func openButtonTapped() {
-		UIApplication.openApp(with: app.CFBundleIdentifier ?? "")
+		_ = TrollStoreAppManager.openApp(bundleIdentifier: app.bundleIdentifier)
 	}
 }
 
@@ -238,9 +229,7 @@ extension ATAppInfoViewController {
 		cell.contentConfiguration = config
 		
 		let selectableTitles: [String] = [
-			.localized("Entitlements"),
-			.localized("Icons"),
-			.localized("Icons (iPad)")
+			.localized("Entitlements")
 		]
 		
 		if selectableTitles.contains(item.title) {
@@ -258,17 +247,9 @@ extension ATAppInfoViewController {
 		let item = _infoSections[indexPath.section][indexPath.row]
 		
 		if item.title == .localized("Entitlements") {
-			let detailVC = ATDictionaryViewController(title: item.title, entitlements: app.Entitlements ?? [:])
-			navigationController?.pushViewController(detailVC, animated: true)
-		}
-		
-		if item.title == .localized("Icons") {
-			let detailVC = ATDictionaryViewController(title: item.title, entitlements: app.CFBundleIcons ?? [:])
-			navigationController?.pushViewController(detailVC, animated: true)
-		}
-		
-		if item.title == .localized("Icons (iPad)") {
-			let detailVC = ATDictionaryViewController(title: item.title, entitlements: app.CFBundleIcons_iPad ?? [:])
+			let entitlements = app.entitlements ?? [:]
+			let convertedEntitlements = entitlements.mapValues { AnyCodable($0) }
+			let detailVC = ATDictionaryViewController(title: item.title, entitlements: convertedEntitlements)
 			navigationController?.pushViewController(detailVC, animated: true)
 		}
 	}
@@ -281,6 +262,60 @@ extension ATAppInfoViewController {
 				UIPasteboard.general.string = item.value
 			}
 			return UIMenu(children: [copyAction])
+		}
+	}
+}
+
+// MARK: - AnyCodable Helper
+struct AnyCodable: Codable {
+	let value: Any
+	
+	init(_ value: Any) {
+		self.value = value
+	}
+	
+	init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		
+		if container.decodeNil() {
+			value = NSNull()
+		} else if let bool = try? container.decode(Bool.self) {
+			value = bool
+		} else if let int = try? container.decode(Int.self) {
+			value = int
+		} else if let double = try? container.decode(Double.self) {
+			value = double
+		} else if let string = try? container.decode(String.self) {
+			value = string
+		} else if let array = try? container.decode([AnyCodable].self) {
+			value = array.map { $0.value }
+		} else if let dictionary = try? container.decode([String: AnyCodable].self) {
+			value = dictionary.mapValues { $0.value }
+		} else {
+			throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported type")
+		}
+	}
+	
+	func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		
+		switch value {
+		case is NSNull:
+			try container.encodeNil()
+		case let bool as Bool:
+			try container.encode(bool)
+		case let int as Int:
+			try container.encode(int)
+		case let double as Double:
+			try container.encode(double)
+		case let string as String:
+			try container.encode(string)
+		case let array as [Any]:
+			try container.encode(array.map { AnyCodable($0) })
+		case let dictionary as [String: Any]:
+			try container.encode(dictionary.mapValues { AnyCodable($0) })
+		default:
+			throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unsupported type"))
 		}
 	}
 }

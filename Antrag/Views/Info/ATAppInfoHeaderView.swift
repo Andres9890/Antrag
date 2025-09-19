@@ -1,12 +1,11 @@
 //
 //  ATAppInfoHeaderView.swift
-//  Antrag
+//  Antrag - TrollStore Version
 //
-//  Created by samara on 7.06.2025.
+//  Updated to use TSAppInfo instead of AppInfo from idevice
 //
 
 import UIKit
-import IDeviceSwift
 
 // MARK: - Class
 class ATAppInfoHeaderView: UIView {
@@ -96,22 +95,28 @@ class ATAppInfoHeaderView: UIView {
 	}
 	
 	@objc private func openButtonTapped() {
-		UIApplication.openApp(with: identifier)
+		_ = TrollStoreAppManager.openApp(bundleIdentifier: identifier)
 	}
 	
-	func configure(with app: AppInfo) {
-		let name = app.CFBundleDisplayName ?? app.CFBundleExecutable
-		let identifier = app.CFBundleIdentifier ?? ""
+	func configure(with app: TSAppInfo) {
+		let name = app.displayName ?? app.executableName ?? "Unknown"
+		let identifier = app.bundleIdentifier
 		self.identifier = identifier
 		
 		nameLabel.text = name
 		descriptionLabel.text = identifier
 		
-		Task { [weak self] in
-			guard let self else { return }
-			if let image = try? await InstallationAppProxy.getAppIconCached(for: identifier) {
-				DispatchQueue.main.async {
-					self.iconImageView.image = image
+		// Set icon if available from TSAppInfo
+		if let iconData = app.iconData, let image = UIImage(data: iconData) {
+			iconImageView.image = image
+		} else {
+			// Fallback: try to get icon asynchronously
+			Task { [weak self] in
+				guard let self else { return }
+				if let image = try? await TrollStoreAppManager.getAppIcon(for: identifier) {
+					DispatchQueue.main.async {
+						self.iconImageView.image = image
+					}
 				}
 			}
 		}
